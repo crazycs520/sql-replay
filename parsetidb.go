@@ -1,15 +1,15 @@
 package main
 
 import (
-    "bufio"
-    "encoding/json"
-    "fmt"
-    "github.com/pingcap/tidb/pkg/parser"
-    "os"
-    "regexp"
-    "strconv"
-    "strings"
-    "time"
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"github.com/pingcap/tidb/pkg/parser"
+	"os"
+	"regexp"
+	"strconv"
+	"strings"
+	"time"
 )
 
 func ParseTiDBLogs(slowLogPath, slowOutputPath string) {

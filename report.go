@@ -1,45 +1,45 @@
 package main
 
 import (
-    "database/sql"
-    "fmt"
-    "time"
-    "html/template"
-    "log"
-    "net/http"
+	"database/sql"
+	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+	"time"
 
-    _ "github.com/go-sql-driver/mysql"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 type QueryResult struct {
-    SQL     string
-    Columns []string
-    Rows    [][]interface{}
-    Error   error
+	SQL     string
+	Columns []string
+	Rows    [][]interface{}
+	Error   error
 }
 
 func Report(dbConnStr, replayOut, Port string) {
-    if dbConnStr == "" || replayOut == "" {
-        fmt.Println("Usage: ./sql-replay -mode report -db <mysql_connection_string> -replay-name <replay name> -port ':8081'")
-        return
-    }
-    // 连接数据库
-    db, err := sql.Open("mysql", dbConnStr)
-    if err != nil {
-        log.Fatal(err)
-    }
-    defer db.Close()
+	if dbConnStr == "" || replayOut == "" {
+		fmt.Println("Usage: ./sql-replay -mode report -db <mysql_connection_string> -replay-name <replay name> -port ':8081'")
+		return
+	}
+	// 连接数据库
+	db, err := sql.Open("mysql", dbConnStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-    // 定义 SQL 查询
-    queries := map[string]string{
-        "Replay Summary": `select min(SUBSTRING_INDEX(file_name,'.',1)) replay_name,count(*) sql_cnts,
+	// 定义 SQL 查询
+	queries := map[string]string{
+		"Replay Summary": `select min(SUBSTRING_INDEX(file_name,'.',1)) replay_name,count(*) sql_cnts,
             sum(case when query_time>execution_time and error_info='' then 1 else 0 end) faster_cnts,
             sum(case when query_time<execution_time and error_info ='' then 1 else 0 end) slower_cnts,
             sum(case when error_info<>'' then 1 else 0 end) err_cnts,
             round(sum(case when error_info='' then ri.query_time else 0 end)/1000000/60,2) "before_sql_time(min)",
             round(sum(case when error_info='' then ri.execution_time else 0 end)/1000000/60,2) "now_sql_time(min)"
             from replay_info ri where ri.file_name like concat(?,'%')`,
-        "Sample1: <500us": `SELECT
+		"Sample1: <500us": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -56,7 +56,7 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) <= 500
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sample2: 500us~1ms": `SELECT
+		"Sample2: 500us~1ms": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -73,7 +73,7 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) > 500 AND AVG(query_time) <= 1000
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sample3: 1ms~10ms": `SELECT
+		"Sample3: 1ms~10ms": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -90,7 +90,7 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) > 1000 AND AVG(query_time) <= 10000
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sample4: 10ms~100ms": `SELECT
+		"Sample4: 10ms~100ms": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -107,7 +107,7 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) > 10000 AND AVG(query_time) <= 100000
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sample5: 100ms~1s": `SELECT
+		"Sample5: 100ms~1s": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -124,7 +124,7 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) > 100000 AND AVG(query_time) <= 1000000
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sample6: 1s~10s": `SELECT
+		"Sample6: 1s~10s": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -141,7 +141,7 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) > 1000000 AND AVG(query_time) <= 10000000
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sample7: >10s": `SELECT
+		"Sample7: >10s": `SELECT
             sql_digest,max(concat(sql_type,':',ifnull(db_name,''))) sql_type,
             COUNT(*) AS exec_cnts,
             round(AVG(execution_time / 1000),2) AS current_ms,
@@ -158,59 +158,59 @@ func Report(dbConnStr, replayOut, Port string) {
             AVG(query_time) > 10000000
         ORDER BY
             avg(execution_time)/avg(query_time) desc`,
-        "Sql Error Info": `select sql_digest,count(*) exec_cnts,concat(ifnull(max(db_name),''),':',substr(min(error_info),1,256)) as error_info,min(sql_text) as sample_sql_text from replay_info where error_info <>'' and file_name like concat(?,'%') group by sql_digest,substr(error_info,1,10) order by count(*) desc`,
-    }
+		"Sql Error Info": `select sql_digest,count(*) exec_cnts,concat(ifnull(max(db_name),''),':',substr(min(error_info),1,256)) as error_info,min(sql_text) as sample_sql_text from replay_info where error_info <>'' and file_name like concat(?,'%') group by sql_digest,substr(error_info,1,10) order by count(*) desc`,
+	}
 
-    ts_begin_query := time.Now()
-    fmt.Printf("[%s] Begin execute query\n",ts_begin_query.Format("2006-01-02 15:04:05.000"))
+	ts_begin_query := time.Now()
+	fmt.Printf("[%s] Begin execute query\n", ts_begin_query.Format("2006-01-02 15:04:05.000"))
 
-    // 预先执行查询并存储结果
-    results := make(map[string]QueryResult)
-    for name, query := range queries {
-        rows, err := db.Query(query, replayOut)
-        if err != nil {
-            results[name] = QueryResult{SQL: name, Error: err}
-            continue
-        }
-        defer rows.Close()
+	// 预先执行查询并存储结果
+	results := make(map[string]QueryResult)
+	for name, query := range queries {
+		rows, err := db.Query(query, replayOut)
+		if err != nil {
+			results[name] = QueryResult{SQL: name, Error: err}
+			continue
+		}
+		defer rows.Close()
 
-        columns, err := rows.Columns()
-        if err != nil {
-            results[name] = QueryResult{SQL: name, Error: err}
-            continue
-        }
+		columns, err := rows.Columns()
+		if err != nil {
+			results[name] = QueryResult{SQL: name, Error: err}
+			continue
+		}
 
-        var rowsData [][]interface{}
-        for rows.Next() {
-            values := make([]interface{}, len(columns))
-            valuePtrs := make([]interface{}, len(columns))
-            for i := range values {
-                valuePtrs[i] = &values[i]
-            }
-            if err := rows.Scan(valuePtrs...); err != nil {
-                results[name] = QueryResult{SQL: name, Error: err}
-                continue
-            }
-            rowData := make([]interface{}, len(columns))
-            for i, v := range values {
-                b, ok := v.([]byte)
-                if ok {
-                    rowData[i] = string(b)
-                } else {
-                    rowData[i] = v
-                }
-            }
-            rowsData = append(rowsData, rowData)
-        }
+		var rowsData [][]interface{}
+		for rows.Next() {
+			values := make([]interface{}, len(columns))
+			valuePtrs := make([]interface{}, len(columns))
+			for i := range values {
+				valuePtrs[i] = &values[i]
+			}
+			if err := rows.Scan(valuePtrs...); err != nil {
+				results[name] = QueryResult{SQL: name, Error: err}
+				continue
+			}
+			rowData := make([]interface{}, len(columns))
+			for i, v := range values {
+				b, ok := v.([]byte)
+				if ok {
+					rowData[i] = string(b)
+				} else {
+					rowData[i] = v
+				}
+			}
+			rowsData = append(rowsData, rowData)
+		}
 
-        if err := rows.Err(); err != nil {
-            results[name] = QueryResult{SQL: name, Error: err}
-        }
+		if err := rows.Err(); err != nil {
+			results[name] = QueryResult{SQL: name, Error: err}
+		}
 
-        results[name] = QueryResult{SQL: name, Columns: columns, Rows: rowsData}
-    }
+		results[name] = QueryResult{SQL: name, Columns: columns, Rows: rowsData}
+	}
 
-    tmpl := `
+	tmpl := `
 <!DOCTYPE html>
 <html>
 <head>
@@ -412,21 +412,21 @@ func Report(dbConnStr, replayOut, Port string) {
 </html>
 `
 
-    t, err := template.New("webpage").Parse(tmpl)
-    if err != nil {
-        log.Fatal(err)
-    }
+	t, err := template.New("webpage").Parse(tmpl)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        if err := t.Execute(w, results); err != nil {
-            log.Fatal(err)
-        }
-    })
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if err := t.Execute(w, results); err != nil {
+			log.Fatal(err)
+		}
+	})
 
-    ts_finsh_query := time.Now()
+	ts_finsh_query := time.Now()
 
-    fmt.Printf("[%s] Server is running on port %s\n",ts_finsh_query.Format("2006-01-02 15:04:05.000"),Port)
-    if err := http.ListenAndServe(Port, nil); err != nil {
-        log.Fatal(err)
-    }
+	fmt.Printf("[%s] Server is running on port %s\n", ts_finsh_query.Format("2006-01-02 15:04:05.000"), Port)
+	if err := http.ListenAndServe(Port, nil); err != nil {
+		log.Fatal(err)
+	}
 }

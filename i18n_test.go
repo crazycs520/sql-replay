@@ -49,7 +49,7 @@ func TestI18n_T(t *testing.T) {
 		{"es", "hello", nil, "Hola"},
 		{"en", "world", nil, "World"},
 		{"es", "world", nil, "Mundo"},
-		{"fr", "hello", nil, "Hello"},  // Fallback to default language
+		{"fr", "hello", nil, "Hello"},     // Fallback to default language
 		{"en", "unknown", nil, "unknown"}, // Key not found
 		{"en", "with_args", []interface{}{"John"}, "Hello, John!"},
 		{"es", "with_args", []interface{}{"Juan"}, "¡Hola, Juan!"},

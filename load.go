@@ -24,7 +24,7 @@ func LoadData(dbConnStr, outDir, replayOut, tableName string) {
 		return
 	}
 
-        fmt.Printf("load batchsize: %d, load workers: %d\n",batchSize,workers)
+	fmt.Printf("load batchsize: %d, load workers: %d\n", batchSize, workers)
 
 	db, err := sql.Open("mysql", dbConnStr)
 	if err != nil {
@@ -33,8 +33,8 @@ func LoadData(dbConnStr, outDir, replayOut, tableName string) {
 	}
 	defer db.Close()
 
-        ts_create_table := time.Now()
-        fmt.Printf("[%s] Begin create table - REPLAY_INFO\n", ts_create_table.Format("2006-01-02 15:04:05.000"))
+	ts_create_table := time.Now()
+	fmt.Printf("[%s] Begin create table - REPLAY_INFO\n", ts_create_table.Format("2006-01-02 15:04:05.000"))
 	if err := createTableIfNotExists(db, tableName); err != nil {
 		fmt.Println("create table failed:", err)
 		return
